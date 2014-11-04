@@ -1,13 +1,10 @@
-// we don't care about safe i/o functions
-#define _CRT_SECURE_NO_WARNINGS
-
 #include <Windows.h>
 
-// this macro (WM_TRAY_DBCLK) will be the ID for the tray icon interaction
+// this macro will be the ID for the tray icon interaction
 // (since NOTIFYICONDATA's callback is an ID)
 // we catch it in WndProc's nMsg which holds it when
 // something happens to the tray icon. (eg. mouse click, tab focus)
-#define WM_TRAY_DBCLK (WM_USER+100)
+#define WM_TRAY_EVENT (WM_USER+100)
 
 // it holds the tray icon data (icon, properties, balloon tip)
 NOTIFYICONDATA g_TrayIconInfo;
@@ -42,7 +39,7 @@ LRESULT CALLBACK WndProc(
     switch (nMsg)
     {
         // if we are doing interaction with the tray icon
-        case WM_TRAY_DBCLK:
+        case WM_TRAY_EVENT:
             
             // for a double-click, we simply exit the application
             if (lParam == WM_LBUTTONDBLCLK){
