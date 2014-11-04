@@ -4,7 +4,7 @@
 #include <Windows.h>
 #include "crt.h"
 
-static unsigned int SwapColorOrder(unsigned int color)
+unsigned int SwapColorOrder(unsigned int color)
 {
     return 
           ((color & 0xff0000) >> 16)
@@ -17,17 +17,22 @@ void SetClipboardText(char *output)
     // len: #aabbcc\0 <- 8db
     const SIZE_T len = 8;
 
-    // allocate clipboard-size space in OS memory
-    HGLOBAL hMem =  GlobalAlloc(GMEM_MOVEABLE, len);
+    // allocate space for clipboard only once
+    static HGLOBAL hOSMem = NULL;
 
-    hMem = GlobalLock(hMem);
-    //CopyMemory(hMem, output, len);
-    tiny_memcpy(hMem, output, len);
-    GlobalUnlock(hMem);
+    if (hOSMem == NULL)
+    {
+        // allocate clipboard-size space in OS memory
+        hOSMem = GlobalAlloc(GMEM_MOVEABLE, len);
+    }
+
+    hOSMem = GlobalLock(hOSMem);
+    tiny_memcpy(hOSMem, output, len);
+    GlobalUnlock(hOSMem);
     
     OpenClipboard(NULL);
     EmptyClipboard();
-    SetClipboardData(CF_TEXT, hMem);
+    SetClipboardData(CF_TEXT, hOSMem);
     CloseClipboard();
 }
 
@@ -71,7 +76,6 @@ HICON HBitmapToHIcon(HBITMAP hBmp)
     GetObject(hBmp, sizeof(BITMAP), &bm);
     HBITMAP hbmMask = CreateCompatibleBitmap(hDisplay, bm.bmWidth, bm.bmHeight);
     ICONINFO iconinf;
-    //ZeroMemory(&iconinf, sizeof(ICONINFO));
     tiny_memset(&iconinf, 0, sizeof(ICONINFO));
     iconinf.fIcon    = TRUE;
     iconinf.hbmColor = hBmp;
@@ -87,14 +91,19 @@ HICON HBitmapToHIcon(HBITMAP hBmp)
 void RefreshBitmapIcon(POINT curpos, int keyPressed)
 {
     static int s_lastPixelColor = 0xffffff;
+    static int s_lastKeyPress = 0;
     int pixelColor = GetPixelColorRGB(curpos);
     
     // if the current color is the same as the one before
     // we simply skip refreshing the icon
-    if (s_lastPixelColor == pixelColor)
+    // if key state is changing we also want to refresh the icon
+    if (s_lastPixelColor == pixelColor && (keyPressed == s_lastKeyPress))
         return;
-    else 
+    else
+    {
         s_lastPixelColor = pixelColor;
+        s_lastKeyPress = keyPressed;
+    }
     
     HDC hDisplay = GetDC(NULL);
     HDC hCanvas = CreateCompatibleDC(hDisplay);
@@ -133,7 +142,7 @@ void CreateTrayIcon(
     trayinf->hWnd             = hwnd;
     trayinf->uFlags           = NIF_MESSAGE | NIF_ICON | NIF_TIP | NIF_INFO;
     trayinf->dwInfoFlags      = NIIF_NONE;
-    trayinf->uCallbackMessage = WM_TRAY_DBCLK;
+    trayinf->uCallbackMessage = WM_TRAY_EVENT;
     
     // actually  it doesn't make any sense because
     // the balloon message stays for like 3500 ms in any case
